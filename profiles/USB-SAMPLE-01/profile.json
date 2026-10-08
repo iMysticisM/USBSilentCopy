@@ -1,0 +1,38 @@
+{
+  "profileId": "USB-SAMPLE-01",
+  "friendlyName": "Samsung 64GB Flash Drive (D:)",
+  "enabled": true,
+  "customDestination": "Backup/PersonalUSB",
+  "backupFolderTemplate": "{VolumeLabel}_{Date}_{Time}",
+  "customSpeedLimitMBps": 20,
+  "createdDate": "2026-10-08T20:00:00",
+  "lastSeenDate": "2026-10-08T20:30:00",
+  "customFilters": {
+    "includeExtensions": [
+      ".docx",
+      ".pdf",
+      ".xlsx",
+      ".jpg",
+      ".png"
+    ],
+    "excludeExtensions": [],
+    "includeCategories": [
+      "Documents",
+      "Images"
+    ],
+    "excludeCategories": [
+      "Executables"
+    ],
+    "includeFolders": [],
+    "excludeFolders": [
+      "$RECYCLE.BIN",
+      "System Volume Information"
+    ],
+    "minSizeMB": null,
+    "maxSizeMB": 500,
+    "modifiedAfter": null,
+    "modifiedBefore": null,
+    "createdAfter": null,
+    "createdBefore": null
+  }
+}
