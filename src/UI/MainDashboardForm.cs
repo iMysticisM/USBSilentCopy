@@ -518,7 +518,20 @@ public sealed class MainDashboardForm : Form
         var saved = _coordinator.ConfigManager.Save(cfg);
         if (saved)
         {
-            MessageBox.Show(this, "تنظیمات با موفقیت ذخیره شد.", "تأیید", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (cfg.SilentMode)
+            {
+                MessageBox.Show(this,
+                    "حالت خاموش (Silent Mode) فعال شد.\nداشبورد بسته می‌شود، آیکون سینی ویندوز مخفی شده و برنامه صرفاً به عنوان یک پروسس در پس‌زمینه ویندوز به فعالیت ادامه می‌دهد.\n\nبرای باز کردن مجدد داشبورد، می‌توانید از سوئیچ زیر استفاده کنید:\nUSBSilentCopy.exe --ui",
+                    "فعال‌سازی حالت خاموش",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                this.Close();
+            }
+            else
+            {
+                MessageBox.Show(this, "تنظیمات با موفقیت ذخیره شد.", "تأیید", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
         else
         {
@@ -606,7 +619,7 @@ public sealed class MainDashboardForm : Form
         catch { }
     }
 
-    private void InvokeSafe(Action action)
+    public void InvokeSafe(Action action)
     {
         if (IsDisposed || !IsHandleCreated)
             return;

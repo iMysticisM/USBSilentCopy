@@ -46,10 +46,36 @@ public sealed class TrayAppContext : ApplicationContext
             Icon = icon,
             ContextMenuStrip = contextMenu,
             Text = $"{Constants.ApplicationName} - پایش خودکار USB",
-            Visible = true
+            Visible = !_coordinator.ConfigManager.Current.SilentMode
         };
 
         _notifyIcon.DoubleClick += (s, e) => ShowDashboard();
+
+        // اتصال به رویداد درخواست نمایش رابط کاربری (مثلاً اجرای USBSilentCopy.exe --ui)
+        _coordinator.ShowUiRequested += () =>
+        {
+            if (_dashboardForm != null && !_dashboardForm.IsDisposed)
+            {
+                _dashboardForm.InvokeSafe(() => ShowDashboard());
+            }
+            else
+            {
+                ShowDashboard();
+            }
+        };
+
+        // واکنش به تغییرات تنظیمات برای فعال یا غیرفعال کردن پویای آیکون سینی ویندوز
+        _coordinator.ConfigManager.ConfigChanged += updatedConfig =>
+        {
+            _notifyIcon.Visible = !updatedConfig.SilentMode;
+            if (updatedConfig.SilentMode)
+            {
+                if (_dashboardForm != null && !_dashboardForm.IsDisposed)
+                {
+                    _dashboardForm.InvokeSafe(() => _dashboardForm.Close());
+                }
+            }
+        };
 
         // اتصال رویدادهای صف برای به‌روزرسانی منو و ارسال اعلان‌های اختیاری
         _coordinator.BackupQueue.QueueStatusChanged += () =>
@@ -65,7 +91,7 @@ public sealed class TrayAppContext : ApplicationContext
 
         _coordinator.BackupQueue.ItemStarted += item =>
         {
-            if (_coordinator.ConfigManager.Current.EnableNotifications)
+            if (!_coordinator.ConfigManager.Current.SilentMode && _coordinator.ConfigManager.Current.EnableNotifications)
             {
                 _notifyIcon.ShowBalloonTip(3000, "شروع پشتیبان‌گیری", $"در حال پشتیبان‌گیری از درایو {item.Device.DisplayName}...", ToolTipIcon.Info);
             }
@@ -73,7 +99,7 @@ public sealed class TrayAppContext : ApplicationContext
 
         _coordinator.BackupQueue.ItemCompleted += (item, result) =>
         {
-            if (_coordinator.ConfigManager.Current.EnableNotifications)
+            if (!_coordinator.ConfigManager.Current.SilentMode && _coordinator.ConfigManager.Current.EnableNotifications)
             {
                 var iconType = result.Status == BackupStatus.Completed ? ToolTipIcon.Info : ToolTipIcon.Warning;
                 var msg = result.Status == BackupStatus.Completed

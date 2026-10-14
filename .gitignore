@@ -12,6 +12,7 @@
 publish/
 *.tmp
 *.log
+*.zip
 
 ## Application Runtime Data
 logs/

@@ -1,4 +1,5 @@
 using USBSilentCopy.Core;
+using USBSilentCopy.DeviceDetection;
 using USBSilentCopy.UI;
 
 namespace USBSilentCopy;
@@ -10,38 +11,30 @@ internal static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        // ۱. تنظیم مدیریت کرش و خطاهای غیرمنتظره سراسری
+        // ۱. ثبت مدیریت خطاهای بحرانی سراسری
         AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
-            try
-            {
-                var ex = e.ExceptionObject as Exception;
-                var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "crash.log");
-                var dir = Path.GetDirectoryName(logFile);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] CRASH: {ex?.Message}\n{ex?.StackTrace}\n\n");
-            }
-            catch { }
+            var ex = e.ExceptionObject as Exception;
+            HandleCrash(ex, "AppDomain UnhandledException");
         };
 
         Application.ThreadException += (s, e) =>
         {
-            try
-            {
-                var logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "crash.log");
-                var dir = Path.GetDirectoryName(logFile);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                {
-                    Directory.CreateDirectory(dir);
-                }
-                File.AppendAllText(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UI_THREAD_EXCEPTION: {e.Exception.Message}\n{e.Exception.StackTrace}\n\n");
-            }
-            catch { }
+            HandleCrash(e.Exception, "UI ThreadException");
         };
 
+        try
+        {
+            RunApplication(args);
+        }
+        catch (Exception ex)
+        {
+            HandleCrash(ex, "Main Process Startup Exception");
+        }
+    }
+
+    private static void RunApplication(string[] args)
+    {
         // ۲. پردازش آرگومان‌های خط فرمان
         var forceSilent = args.Any(a => string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-s", StringComparison.OrdinalIgnoreCase));
         var forceUi = args.Any(a => string.Equals(a, "--ui", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "-u", StringComparison.OrdinalIgnoreCase));
@@ -57,40 +50,69 @@ internal static class Program
         }
 
         // ۳. ساخت هماهنگ‌کننده برنامه
-        AppCoordinator coordinator;
-        try
-        {
-            coordinator = new AppCoordinator(customConfigPath);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"خطا در راه‌اندازی هسته برنامه: {ex.Message}", "خطای راه‌اندازی", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        }
+        var coordinator = new AppCoordinator(customConfigPath);
 
         // ۴. بررسی اجرای تک‌نسخه‌ای (Single Instance)
         if (!coordinator.InstanceMutex.TryAcquire())
         {
-            // نسخه دیگری از برنامه در حال اجراست
+            // نسخه دیگری از برنامه از قبل در حال اجراست
+            if (forceUi)
+            {
+                // درخواست از پروسس پس‌زمینه برای نمایش پنجره داشبورد
+                DeviceDetector.PostMessage((IntPtr)DeviceDetector.HWND_BROADCAST, DeviceDetector.WM_SHOW_UI, IntPtr.Zero, IntPtr.Zero);
+            }
             coordinator.Dispose();
             return;
         }
 
-        // ۵. تعیین وضعیت حالت خاموش یا رابط کاربری
-        var isSilent = forceSilent || (coordinator.ConfigManager.Current.SilentMode && !forceUi);
+        // ۵. راه‌اندازی کانتکست اجرای برنامه
+        var trayContext = new TrayAppContext(coordinator);
 
-        if (isSilent)
+        if (forceUi)
         {
-            Application.Run(new HeadlessContext(coordinator));
+            trayContext.ShowDashboard();
         }
-        else
+
+        Application.Run(trayContext);
+    }
+
+    private static void HandleCrash(Exception? ex, string context)
+    {
+        var exitCode = ex?.HResult != 0 && ex?.HResult != null ? ex.HResult : 1;
+        try
         {
-            var trayContext = new TrayAppContext(coordinator);
-            if (forceUi)
+            var timeStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var logDetails = $"[{timeStr}] FATAL CRASH ({context})\n" +
+                             $"ExitCode: {exitCode} (0x{exitCode:X8})\n" +
+                             $"Type: {ex?.GetType().FullName}\n" +
+                             $"Message: {ex?.Message}\n" +
+                             $"StackTrace:\n{ex?.StackTrace}\n\n";
+
+            var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+            if (!Directory.Exists(logDir))
             {
-                trayContext.ShowDashboard();
+                Directory.CreateDirectory(logDir);
             }
-            Application.Run(trayContext);
+            File.AppendAllText(Path.Combine(logDir, "crash.log"), logDetails);
+
+            // خروج موقت از سایلنت و نمایش پیام صریح و کاربردی خطا
+            var userMessage = $"برنامه USBSilentCopy با یک خطای غیرمنتظره مواجه شد و متوقف گردید.\n\n" +
+                              $"نوع خطا: {ex?.GetType().Name}\n" +
+                              $"پیام خطا: {ex?.Message}\n" +
+                              $"کد خروج (Exit Code): {exitCode} (0x{exitCode:X8})\n\n" +
+                              $"جزئیات کامل در مسیر زیر ثبت شد:\nlogs\\crash.log\n\n" +
+                              $"(توجه: تنظیمات شما از جمله Silent Mode در config.json کاملاً دست‌نخورده و محفوظ باقی مانده است)";
+
+            MessageBox.Show(
+                userMessage,
+                $"خطای بحرانی در USBSilentCopy (کد خروج: {exitCode})",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        catch { }
+        finally
+        {
+            Environment.Exit(exitCode);
         }
     }
 }

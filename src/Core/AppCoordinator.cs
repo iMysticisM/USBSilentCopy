@@ -71,12 +71,22 @@ public class AppCoordinator : IDisposable
             HotKeyManager.Start();
         }
 
+        // رویداد درخواست نمایش رابط کاربری از طرف پروسس ثانویه
+        DeviceDetector.ShowUiRequested += () => ShowUiRequested?.Invoke();
+
         // بررسی تنظیمات Startup
         if (ConfigManager.Current.StartupCurrentUser)
         {
             StartupManager.SetStartupCurrentUser(true);
         }
+
+        if (ConfigManager.Current.StartupAllUsers)
+        {
+            StartupManager.SetStartupAllUsers(true);
+        }
     }
+
+    public event Action? ShowUiRequested;
 
     public void Start()
     {

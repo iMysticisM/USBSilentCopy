@@ -14,6 +14,16 @@ public class DeviceDetector : IDisposable
     private const int DBT_DEVICEREMOVECOMPLETE = 0x8004;
     private const int DBT_DEVTYP_VOLUME = 0x00000002;
 
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    public static extern int RegisterWindowMessage(string lpString);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+    public static readonly int WM_SHOW_UI = RegisterWindowMessage("USBSilentCopy_ShowUI_Msg_9D82");
+    public const int HWND_BROADCAST = 0xFFFF;
+
     private readonly LogManager _logManager;
     private readonly int _delaySeconds;
     private readonly DeviceChangeWindow _window;
@@ -23,6 +33,7 @@ public class DeviceDetector : IDisposable
 
     public event Action<UsbDeviceInfo>? DeviceConnected;
     public event Action<string>? DeviceDisconnected;
+    public event Action? ShowUiRequested;
 
     public DeviceDetector(LogManager logManager, int delaySeconds = 3)
     {
@@ -184,6 +195,10 @@ public class DeviceDetector : IDisposable
             if (m.Msg == WM_DEVICECHANGE)
             {
                 _detector.OnDeviceChangeEvent((int)m.WParam, m.LParam);
+            }
+            else if (m.Msg == WM_SHOW_UI)
+            {
+                _detector.ShowUiRequested?.Invoke();
             }
             base.WndProc(ref m);
         }

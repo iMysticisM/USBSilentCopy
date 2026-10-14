@@ -4,7 +4,7 @@ public static class Constants
 {
     public const string ApplicationName = "USBSilentCopy";
     public const string ApplicationVersion = "1.0.0";
-    public const string SingleInstanceMutexId = @"Global\USBSilentCopy_Mutex_9D82A7C3";
+    public const string SingleInstanceMutexId = @"Local\USBSilentCopy_Mutex_9D82A7C3";
 
     public const string DefaultConfigFileName = "config.json";
     public const string DefaultBackupFolderTemplate = "{VolumeLabel}_{DriveLetter}_{Date}_{Time}";

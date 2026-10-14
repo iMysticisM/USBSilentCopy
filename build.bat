@@ -7,6 +7,6 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-dotnet publish src/USBSilentCopy.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
+dotnet publish src/USBSilentCopy.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o publish
 copy /y config\config.json publish\config.json
 echo === Build Complete! Output in publish\ folder ===
